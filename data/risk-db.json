@@ -1,0 +1,13 @@
+{
+  "elliptic": { "severity": "high", "reason": "ECC implementation, broken by Shor's algorithm" },
+  "secp256k1": { "severity": "high", "reason": "Elliptic curve crypto, broken by Shor's algorithm" },
+  "eccrypto": { "severity": "high", "reason": "ECC-based encryption, broken by Shor's algorithm" },
+  "node-rsa": { "severity": "high", "reason": "RSA implementation, broken by Shor's algorithm" },
+  "jsrsasign": { "severity": "high", "reason": "RSA/ECDSA toolkit, broken by Shor's algorithm" },
+  "node-forge": { "severity": "medium", "reason": "Supports RSA/ECC; flag if used for those, not just TLS" },
+  "jsonwebtoken": { "severity": "medium", "reason": "Often configured with RS256/ES256 (quantum-vulnerable signing)" },
+  "jose": { "severity": "medium", "reason": "JWT/JWS library, check for RSA/EC algorithm usage" },
+  "tweetnacl": { "severity": "high", "reason": "Curve25519-based, broken by Shor's algorithm" },
+  "bitcoinjs-lib": { "severity": "high", "reason": "Uses secp256k1 ECDSA for signing" },
+  "ethereumjs-util": { "severity": "high", "reason": "Uses secp256k1 ECDSA for signing" }
+}
