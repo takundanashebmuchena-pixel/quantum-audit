@@ -1,0 +1,32 @@
+{
+  "name": "quantum-audit",
+  "version": "0.2.2",
+  "description": "Scans npm projects for cryptographic primitives vulnerable to quantum attack and scores quantum readiness.",
+  "main": "src/scanner.js",
+  "bin": {
+    "quantum-audit": "bin/cli.js"
+  },
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "keywords": [
+    "post-quantum",
+    "quantum-safe",
+    "cryptography",
+    "blockchain",
+    "ethereum",
+    "security-audit",
+    "ecdsa",
+    "supply-chain"
+  ],
+  "author": "Takundanashe",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/parser": "^7.24.0",
+    "@babel/traverse": "^7.24.0",
+    "chalk": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
