@@ -1,76 +1,68 @@
 #!/usr/bin/env node
-const fs = require('fs');
+
 const path = require('path');
+const fs = require('fs');
+const { runAudit } = require('../src/scanner');
+const { printReport, generateHTML, generateCSV } = require('../src/report');
 
-const riskDb = require('../data/risk-db.json');
+const args = process.argv.slice(2);
 
-function getAllDependencies(dir) {
-  const pkgPath = path.join(dir, 'package.json');
-  if (!fs.existsSync(pkgPath)) {
-    console.error('No package.json found in this directory.');
-    process.exit(1);
-  }
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  const deps = {
-    ...(pkg.dependencies || {}),
-    ...(pkg.devDependencies || {})
-  };
+const targetDir = args.find(a => !a.startsWith('--')) || '.';
+const jsonOutput = args.includes('--json');
+const htmlOutput = args.includes('--html');
+const csvOutput = args.includes('--csv');
 
-  const nodeModulesPath = path.join(dir, 'node_modules');
-  const allFound = new Set(Object.keys(deps));
-
-  if (fs.existsSync(nodeModulesPath)) {
-    const entries = fs.readdirSync(nodeModulesPath);
-    entries.forEach(entry => allFound.add(entry));
-  }
-
-  return Array.from(allFound);
-}
-
-function auditProject(dir) {
-  const allDeps = getAllDependencies(dir);
-  const flagged = [];
-
-  allDeps.forEach(dep => {
-    if (riskDb[dep]) {
-      flagged.push({ package: dep, ...riskDb[dep] });
-    }
-  });
-
-  return flagged;
-}
-
-function scoreResult(flagged) {
-  const highCount = flagged.filter(f => f.severity === 'high').length;
-  const medCount = flagged.filter(f => f.severity === 'medium').length;
-  const penalty = highCount * 15 + medCount * 5;
-  const score = Math.max(0, 100 - penalty);
-  return score;
-}
-
-function printReport(flagged, score) {
-  console.log('\n=== Quantum-Audit Report ===\n');
-
-  if (flagged.length === 0) {
-    console.log('No known quantum-vulnerable packages detected.');
+let threshold = 0;
+const thresholdArg = args.find(a => a.startsWith('--threshold'));
+if (thresholdArg) {
+  if (thresholdArg.includes('=')) {
+    threshold = parseInt(thresholdArg.split('=')[1], 10);
   } else {
-    flagged.forEach(f => {
-      console.log(`[${f.severity.toUpperCase()}] ${f.package} — ${f.reason}`);
-    });
+    const nextArg = args[args.indexOf(thresholdArg) + 1];
+    if (nextArg && !nextArg.startsWith('--')) threshold = parseInt(nextArg, 10);
   }
-
-  console.log(`\nQuantum-Readiness Score: ${score}/100\n`);
 }
 
-const targetDir = process.cwd();
-const flagged = auditProject(targetDir);
-const score = scoreResult(flagged);
-printReport(flagged, score);
+let ignoreList = [];
+const ignoreArg = args.find(a => a.startsWith('--ignore'));
+if (ignoreArg) {
+  const ignoreVal = ignoreArg.includes('=')
+    ? ignoreArg.split('=')[1]
+    : args[args.indexOf(ignoreArg) + 1];
+  if (ignoreVal) ignoreList = ignoreVal.split(',').map(s => s.trim());
+}
 
-const jsonReport = {
-  score,
-  flagged,
-  scannedAt: new Date().toISOString()
-};
-fs.writeFileSync(path.join(targetDir, 'quantum-audit-report.json'), JSON.stringify(jsonReport, null, 2));
-console.log('Full report saved to quantum-audit-report.json');
+const result = runAudit(path.resolve(targetDir), { threshold });
+
+if (ignoreList.length > 0) {
+  result.findings = result.findings.filter(f => {
+    return !ignoreList.some(ig =>
+      f.source === ig || f.algorithm.toLowerCase().includes(ig.toLowerCase())
+    );
+  });
+}
+
+if (jsonOutput) {
+  console.log(JSON.stringify(result, null, 2));
+} else if (htmlOutput) {
+  const html = generateHTML(result);
+  const outFile = 'quantum-audit-report.html';
+  fs.writeFileSync(outFile, html);
+  console.log(`HTML report written to ${outFile}`);
+} else if (csvOutput) {
+  const csv = generateCSV(result);
+  const outFile = 'quantum-audit-report.csv';
+  fs.writeFileSync(outFile, csv);
+  console.log(`CSV report written to ${outFile}`);
+} else {
+  printReport(result);
+}
+
+const hasCritical = result.findings.some(f => f.risk === 'critical');
+const belowThreshold = threshold > 0 && result.score < threshold;
+
+if (hasCritical || belowThreshold) {
+  process.exit(1);
+} else {
+  process.exit(0);
+}
